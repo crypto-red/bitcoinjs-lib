@@ -1,37 +1,16 @@
-'use strict';
-Object.defineProperty(exports, '__esModule', { value: true });
-const networks = require('./networks');
-const payments = require('./payments');
-const bscript = require('./script');
-const types = require('./types');
-const { bech32, bech32m } = require('bech32');
-const bs58check = require('bs58check');
-const typeforce = require('typeforce');
-const FUTURE_SEGWIT_MAX_SIZE = 40;
-const FUTURE_SEGWIT_MIN_SIZE = 2;
-const FUTURE_SEGWIT_MAX_VERSION = 16;
-const FUTURE_SEGWIT_MIN_VERSION = 1;
-const FUTURE_SEGWIT_VERSION_DIFF = 0x50;
-function _toFutureSegwitAddress(output, network) {
-  const data = output.slice(2);
-  if (
-    data.length < FUTURE_SEGWIT_MIN_SIZE ||
-    data.length > FUTURE_SEGWIT_MAX_SIZE
-  )
-    throw new TypeError('Invalid program length for segwit address');
-  const version = output[0] - FUTURE_SEGWIT_VERSION_DIFF;
-  if (
-    version < FUTURE_SEGWIT_MIN_VERSION ||
-    version > FUTURE_SEGWIT_MAX_VERSION
-  )
-    throw new TypeError('Invalid version for segwit address');
-  if (output[1] !== data.length)
-    throw new TypeError('Invalid script for segwit address');
-  return toBech32(data, version, network.bech32);
-}
-function fromBase58Check(address, network) {
-  const payload = bs58check.decode(address);
+const Buffer = require('safe-buffer').Buffer
+const bech32 = require('bech32')
+const bs58check = require('bs58check')
+const bscript = require('./script')
+const networks = require('./networks')
+const typeforce = require('typeforce')
+const types = require('./types')
+const payments = require('./payments')
+
+function fromBase58Check (address, network) {
+  const payload = bs58check.decode(address)
   network = network || networks.bitcoin
+
   // TODO: 4.0.0, move to "toOutputScript"
   if (payload.length < network.bytes) throw new TypeError(address + ' is too short')
   if (payload.length > network.bytes) throw new TypeError(address + ' is too long')
@@ -46,31 +25,21 @@ function fromBase58Check(address, network) {
   if (network.versionBase === 16) {
     version = version.toString(16)
   }
-  return { version, hash };
+
+  return { version: version, hash: hash }
 }
-exports.fromBase58Check = fromBase58Check;
-function fromBech32(address) {
-  let result;
-  let version;
-  try {
-    result = bech32.decode(address);
-  } catch (e) {}
-  if (result) {
-    version = result.words[0];
-    if (version !== 0) throw new TypeError(address + ' uses wrong encoding');
-  } else {
-    result = bech32m.decode(address);
-    version = result.words[0];
-    if (version === 0) throw new TypeError(address + ' uses wrong encoding');
-  }
-  const data = bech32.fromWords(result.words.slice(1));
+
+function fromBech32 (address) {
+  const result = bech32.decode(address)
+  const data = bech32.fromWords(result.words.slice(1))
+
   return {
-    version,
+    version: result.words[0],
     prefix: result.prefix,
-    data: Buffer.from(data),
-  };
+    data: Buffer.from(data)
+  }
 }
-exports.fromBech32 = fromBech32;
+
 function toBase58Check (hash, version, network) {
   typeforce(types.tuple(types.Hash160bit, types.UInt8), [hash, network.bytes])
   typeforce(types.anyOf(types.UInt8, typeforce.HexN(2), typeforce.HexN(4)), version)
@@ -87,76 +56,63 @@ function toBase58Check (hash, version, network) {
   versionBuf.copy(payload, 0)
   hash.copy(payload, bufLength)
 
-  return bs58check.encode(payload);
+  return bs58check.encode(payload)
 }
-exports.toBase58Check = toBase58Check;
-function toBech32(data, version, prefix) {
-  const words = bech32.toWords(data);
-  words.unshift(version);
-  return version === 0
-    ? bech32.encode(prefix, words)
-    : bech32m.encode(prefix, words);
+
+function toBech32 (data, version, prefix) {
+  const words = bech32.toWords(data)
+  words.unshift(version)
+
+  return bech32.encode(prefix, words)
 }
-exports.toBech32 = toBech32;
-function fromOutputScript(output, network) {
-  // TODO: Network
-  network = network || networks.bitcoin;
-  try {
-    return payments.p2pkh({ output, network }).address;
-  } catch (e) {}
-  try {
-    return payments.p2sh({ output, network }).address;
-  } catch (e) {}
-  try {
-    return payments.p2wpkh({ output, network }).address;
-  } catch (e) {}
-  try {
-    return payments.p2wsh({ output, network }).address;
-  } catch (e) {}
-  try {
-    return _toFutureSegwitAddress(output, network);
-  } catch (e) {}
-  throw new Error(bscript.toASM(output) + ' has no matching Address');
+
+function fromOutputScript (output, network) {
+  network = network || networks.bitcoin
+
+  try { return payments.p2pkh({ output, network }).address } catch (e) {}
+  try { return payments.p2sh({ output, network }).address } catch (e) {}
+  try { return payments.p2wpkh({ output, network }).address } catch (e) {}
+  try { return payments.p2wsh({ output, network }).address } catch (e) {}
+
+  throw new Error(bscript.toASM(output) + ' has no matching Address')
 }
-exports.fromOutputScript = fromOutputScript;
-function toOutputScript(address, network) {
-  network = network || networks.bitcoin;
-  let decodeBase58;
-  let decodeBech32;
+
+function toOutputScript (address, network) {
+  network = network || networks.bitcoin
+
+  let decode
   try {
-    decodeBase58 = fromBase58Check(address, network);
+    decode = fromBase58Check(address, network)
   } catch (e) {}
-  if (decodeBase58) {
-    if (decodeBase58.version === network.pubKeyHash)
-      return payments.p2pkh({ hash: decodeBase58.hash }).output;
+
+  if (decode) {
+    if (decode.version === network.pubKeyHash) return payments.p2pkh({ hash: decode.hash }).output
     if (decode.version === network.scriptHash) return payments.p2sh({ hash: decode.hash, network: network }).output
     if (network.versionBase === 16) {
       if (decode.version === network.scriptHash.toString(16)) return payments.p2sh({ hash: decode.hash, network: network }).output
     }
   } else {
     try {
-      decodeBech32 = fromBech32(address);
+      decode = fromBech32(address)
     } catch (e) {}
-    if (decodeBech32) {
-      if (decodeBech32.prefix !== network.bech32)
-        throw new Error(address + ' has an invalid prefix');
-      if (decodeBech32.version === 0) {
-        if (decodeBech32.data.length === 20)
-          return payments.p2wpkh({ hash: decodeBech32.data }).output;
-        if (decodeBech32.data.length === 32)
-          return payments.p2wsh({ hash: decodeBech32.data }).output;
-      } else if (
-        decodeBech32.version >= FUTURE_SEGWIT_MIN_VERSION &&
-        decodeBech32.version <= FUTURE_SEGWIT_MAX_VERSION &&
-        decodeBech32.data.length >= FUTURE_SEGWIT_MIN_SIZE &&
-        decodeBech32.data.length <= FUTURE_SEGWIT_MAX_SIZE
-      )
-        return bscript.compile([
-          decodeBech32.version + FUTURE_SEGWIT_VERSION_DIFF,
-          decodeBech32.data,
-        ]);
+
+    if (decode) {
+      if (decode.prefix !== network.bech32) throw new Error(address + ' has an invalid prefix')
+      if (decode.version === 0) {
+        if (decode.data.length === 20) return payments.p2wpkh({ hash: decode.data }).output
+        if (decode.data.length === 32) return payments.p2wsh({ hash: decode.data }).output
+      }
     }
   }
-  throw new Error(address + ' has no matching Script');
+
+  throw new Error(address + ' has no matching Script')
 }
-exports.toOutputScript = toOutputScript;
+
+module.exports = {
+  fromBase58Check: fromBase58Check,
+  fromBech32: fromBech32,
+  fromOutputScript: fromOutputScript,
+  toBase58Check: toBase58Check,
+  toBech32: toBech32,
+  toOutputScript: toOutputScript
+}
