@@ -1,7 +1,7 @@
 {
-  "name": "bitcoinjs-lib",
-  "version": "5.2.0",
-  "description": "Client-side Bitcoin JavaScript library",
+  "name": "bitcoinjs-lib-x",
+  "version": "5.2.1",
+  "description": "Client-side Bitcoin + x JavaScript library",
   "main": "./src/index.js",
   "types": "./types/index.d.ts",
   "engines": {
@@ -42,7 +42,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/bitcoinjs/bitcoinjs-lib.git"
+    "url": "https://github.com/crypto-red/bitcoinjs-lib.git"
   },
   "files": [
     "src",

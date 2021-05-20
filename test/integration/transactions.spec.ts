@@ -8,7 +8,7 @@ const regtest = regtestUtils.network;
 
 // See bottom of file for some helper functions used to make the payment objects needed.
 
-describe('bitcoinjs-lib (transactions with psbt)', () => {
+describe('bitcoinjs-lib-x (transactions with psbt)', () => {
   it('can create a 1-to-1 Transaction', () => {
     const alice = bitcoin.ECPair.fromWIF(
       'L2uPYXe17xSTqbCjZvL2DsyXPCbXspvcu5mHLDYUgzdUbZGSKrSr',
@@ -168,7 +168,7 @@ describe('bitcoinjs-lib (transactions with psbt)', () => {
       'noredeem',
     );
 
-    const data = Buffer.from('bitcoinjs-lib', 'utf8');
+    const data = Buffer.from('bitcoinjs-lib-x', 'utf8');
     const embed = bitcoin.payments.embed({ data: [data] });
 
     const psbt = new bitcoin.Psbt({ network: regtest })
